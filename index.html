@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Open Cheyyaku</title>
+<meta name="theme-color" content="#f3f4f6">
+<meta name="description" content="Password-protected file vault with a separate password for hidden files.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Layout: one column phone app. Lock screen, then a vault with Files / Hidden tabs and bottom sheets. */
+:root {
+  --bg: #f3f4f6; --card: #ffffff; --border: #d1d5db; --text: #111827; --muted: #6b7280;
+  --accent: #2563eb; --accent-dk: #1d4ed8; --on-accent: #ffffff; --danger: #dc2626;
+  --sel: #dbeafe; --btn: #e5e7eb; --btn-hover: #d1d5db; --head: #eef0f4;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1220; --card: #111c30; --border: #26344d; --text: #e5edf8; --muted: #8ea0b8;
+    --accent: #3b82f6; --accent-dk: #2563eb; --on-accent: #ffffff; --danger: #f87171;
+    --sel: #1e3a6e; --btn: #22304a; --btn-hover: #2d3f5f; --head: #1a2740; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1220; --card: #111c30; --border: #26344d; --text: #e5edf8; --muted: #8ea0b8;
+  --accent: #3b82f6; --accent-dk: #2563eb; --on-accent: #ffffff; --danger: #f87171;
+  --sel: #1e3a6e; --btn: #22304a; --btn-hover: #2d3f5f; --head: #1a2740; color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text); font: 16px/1.4 var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow-x: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+#app { max-width: 720px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); font-size: 14px; min-height: 20px; margin: 8px 0 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px;
+  padding: 0 18px; border: 0; border-radius: 12px; background: var(--btn); color: var(--text);
+  font-weight: 600; cursor: pointer;
+}
+.btn:active { background: var(--btn-hover); }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.primary:active { background: var(--accent-dk); }
+.btn.danger { background: var(--danger); color: #fff; }
+.btn.wide { width: 100%; }
+.btn[disabled] { opacity: .55; pointer-events: none; }
+.link {
+  background: none; border: 0; color: var(--accent); font-weight: 600; padding: 10px 8px; cursor: pointer;
+}
+.icon-btn {
+  width: 44px; height: 44px; display: inline-grid; place-items: center; border: 0; border-radius: 12px;
+  background: transparent; cursor: pointer; color: var(--text);
+}
+.icon-btn:active { background: var(--btn); }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* lock screen */
+.lock { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px 0; gap: 4px; }
+.logo { width: 84px; height: 84px; border-radius: 26px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; margin-bottom: 18px; }
+.logo svg.i { width: 42px; height: 42px; stroke-width: 1.6; }
+.lock h1 { margin: 0; font-size: 28px; letter-spacing: -.01em; }
+.lock p { margin: 6px 0 26px; color: var(--muted); }
+.lock .stack { width: min(320px, 100%); display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.lock .theme-row { margin-top: 26px; display: flex; align-items: center; gap: 8px; justify-content: center; color: var(--muted); font-size: 14px; }
+select.field { min-height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); }
+.banner { background: var(--head); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 14px; margin: 0 0 16px; text-align: left; }
+
+/* vault header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding: 10px 0 8px; }
+.top-row { display: flex; align-items: center; gap: 4px; }
+.top-row h1 { flex: 1; margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--head); padding: 4px; border-radius: 14px; margin-top: 8px; }
+.tab { min-height: 42px; border: 0; border-radius: 10px; background: transparent; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.search { margin-top: 10px; }
+input.field {
+  width: 100%; min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text);
+}
+input.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* file list */
+.list { list-style: none; margin: 8px 0 0; padding: 0 0 120px; display: flex; flex-direction: column; gap: 6px; }
+.row {
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 6px 8px 12px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 14px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; touch-action: pan-y;
+}
+.row[aria-selected="true"] { background: var(--sel); border-color: var(--accent); }
+.tick { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; color: transparent; }
+.row[aria-selected="true"] .tick { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tick svg.i { width: 14px; height: 14px; stroke-width: 3; }
+.badge { flex: none; width: 42px; height: 42px; border-radius: 10px; background: var(--head); color: var(--muted); display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.info { flex: 1; min-width: 0; }
+.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.empty { text-align: center; color: var(--muted); padding: 48px 16px; }
+.empty strong { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
+.locked-card { margin-top: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 20px; text-align: center; }
+.locked-card strong { display: block; font-size: 18px; margin-bottom: 4px; }
+.locked-card p { margin: 0 0 18px; color: var(--muted); }
+
+/* floating add button + selection bar */
+.fab {
+  position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 58px; height: 58px; border-radius: 18px; border: 0; background: var(--accent); color: var(--on-accent);
+  display: grid; place-items: center; box-shadow: 0 6px 18px rgba(0,0,0,.28); cursor: pointer; z-index: 6;
+}
+.fab:active { background: var(--accent-dk); }
+.fab svg.i { width: 28px; height: 28px; stroke-width: 2.2; }
+.selbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; background: var(--card); border-top: 1px solid var(--border);
+  padding: 8px max(10px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px));
+  box-shadow: 0 -6px 20px rgba(0,0,0,.18);
+}
+.selbar-in { max-width: 720px; margin: 0 auto; }
+.selcount { font-size: 14px; color: var(--muted); padding: 0 6px 6px; display: flex; justify-content: space-between; align-items: center; }
+.selactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.selactions button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: transparent; padding: 6px 2px;
+  border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text);
+}
+.selactions button:active { background: var(--btn); }
+.selactions button.danger { color: var(--danger); }
+
+/* sheets */
+.scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; background: var(--card); color: var(--text);
+  border-radius: 22px 22px 0 0; padding: 20px max(20px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px));
+  animation: up .18s ease-out;
+}
+@keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.sheet h2 { margin: 0 0 6px; font-size: 20px; }
+.sheet p { margin: 0 0 12px; color: var(--muted); }
+.sheet .field-label { display: block; font-size: 14px; color: var(--muted); margin: 12px 0 4px; }
+.sheet .actions { display: flex; gap: 10px; margin-top: 16px; }
+.sheet .actions .btn { flex: 1; }
+.check-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--muted); font-size: 14px; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--accent); }
+.menu { display: flex; flex-direction: column; }
+.menu button {
+  display: flex; align-items: center; gap: 14px; min-height: 54px; padding: 0 6px; border: 0; background: transparent;
+  text-align: left; font-weight: 600; border-radius: 10px; cursor: pointer;
+}
+.menu button:active { background: var(--btn); }
+.menu button.danger { color: var(--danger); }
+.menu .sep { height: 1px; background: var(--border); margin: 6px 0; }
+.menu-title { font-weight: 700; margin: 0 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.themes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 16px; }
+.theme-opt { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--border); background: transparent; font-weight: 600; cursor: pointer; text-align: left; }
+.theme-opt[aria-pressed="true"] { border-color: var(--accent); }
+.swatch { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 1px solid rgba(128,128,128,.4); }
+.recovery { font: 600 20px/1.5 ui-monospace, Consolas, monospace; letter-spacing: .04em; text-align: center; background: var(--head); border-radius: 12px; padding: 14px 8px; word-break: break-all; user-select: all; -webkit-user-select: all; }
+
+/* viewer */
+.viewer { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; color: #fff; }
+.viewer-bar { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 8px; background: rgba(0,0,0,.7); }
+.viewer-bar .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.viewer-bar .icon-btn { color: #fff; }
+.viewer-body { flex: 1; min-height: 0; display: grid; place-items: center; overflow: auto; }
+.viewer-body img, .viewer-body video { max-width: 100%; max-height: 100%; }
+.viewer-body pre { margin: 0; padding: 16px; width: 100%; height: 100%; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 14px/1.5 ui-monospace, Consolas, monospace; background: var(--card); color: var(--text); }
+.viewer-body audio { width: min(420px, 92%); }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top, 0px)); z-index: 40;
+  max-width: min(520px, calc(100% - 32px)); background: var(--text); color: var(--bg); padding: 11px 16px; border-radius: 12px; font-size: 14px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.3);
+}
+.busy { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45); display: grid; place-items: center; color: #fff; font-weight: 600; }
+.busy div { background: var(--card); color: var(--text); padding: 18px 24px; border-radius: 14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input type="file" id="file-input" multiple hidden>
+<script>
+'use strict';
+/* ===================================================================== helpers */
+const APP_NAME = 'Open Cheyyaku';
+const enc = new TextEncoder(), dec = new TextDecoder();
+const $ = (s, r = document) => r.querySelector(s);
+
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return e;
+}
+const ICONS = {
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  open: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/>',
+  out: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/>',
+  eyeoff: '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 8.5 4.5 9.5 6-0.5.8-1.5 2.1-3 3.3M6.4 7.8C4.4 9.1 3 11 2.5 12c1 1.5 4.5 6 9.5 6 1.3 0 2.5-.3 3.6-.8"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/>',
+  eye: '<path d="M2.5 12C3.5 10.5 7 6 12 6s8.5 4.5 9.5 6c-1 1.5-4.5 6-9.5 6s-8.5-4.5-9.5-6z"/><circle cx="12" cy="12" r="3"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+  share: '<circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  dots: '<circle cx="12" cy="5.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18.5" r="1.4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  install: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><rect x="4" y="18" width="16" height="2" rx="1"/>'
+};
+function icon(name) {
+  const s = document.createElement('span');
+  s.style.display = 'contents';
+  s.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+  return s.firstChild;
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function humanSize(n) {
+  if (n < 1024) return n + ' B';
+  const u = ['KB', 'MB', 'GB']; let i = -1;
+  do { n /= 1024; i++; } while (n >= 1024 && i < 2);
+  return n.toFixed(1) + ' ' + u[i];
+}
+function fmtDate(ts) {
+  try { return new Date(ts).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return ''; }
+}
+function ext(name) { const m = /\.([^.]+)$/.exec(name); return m ? m[1].toLowerCase() : ''; }
+function mimeOf(name, given) {
+  if (given) return given;
+  const m = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg',
+    txt: 'text/plain', md: 'text/plain', csv: 'text/csv', json: 'application/json', log: 'text/plain', pdf: 'application/pdf' };
+  return m[ext(name)] || 'application/octet-stream';
+}
+let toastTimer;
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = h('div', { class: 'toast', role: 'status', text: msg });
+  document.body.append(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.remove(), 4200);
+}
+function busy(msg) {
+  const b = h('div', { class: 'busy' }, h('div', { text: msg }));
+  document.body.append(b);
+  return () => b.remove();
+}
+function saveBytes(name, bytes, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: type || 'application/octet-stream' }));
+  const a = h('a', { href: url, download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+/* ===================================================================== themes */
+const THEMES = {
+  'Light Blue':  { bg: '#f3f4f6', card: '#ffffff', border: '#d1d5db', text: '#111827', muted: '#6b7280', accent: '#2563eb', 'accent-dk': '#1d4ed8', 'on-accent': '#ffffff', danger: '#dc2626', sel: '#dbeafe', btn: '#e5e7eb', 'btn-hover': '#d1d5db', head: '#eef0f4', dark: false },
+  'Light Green': { bg: '#f3f6f4', card: '#ffffff', border: '#cfd8d3', text: '#10231a', muted: '#5f7368', accent: '#059669', 'accent-dk': '#047857', 'on-accent': '#ffffff', danger: '#dc2626', sel: '#d1fae5', btn: '#e3ebe6', 'btn-hover': '#d0dcd5', head: '#ecf1ee', dark: false },
+  'Dark Teal':   { bg: '#0f172a', card: '#1e293b', border: '#334155', text: '#f1f5f9', muted: '#94a3b8', accent: '#14b8a6', 'accent-dk': '#0d9488', 'on-accent': '#042f2e', danger: '#f87171', sel: '#134e4a', btn: '#334155', 'btn-hover': '#475569', head: '#273449', dark: true },
+  'Dark Blue':   { bg: '#0b1220', card: '#111c30', border: '#26344d', text: '#e5edf8', muted: '#8ea0b8', accent: '#3b82f6', 'accent-dk': '#2563eb', 'on-accent': '#ffffff', danger: '#f87171', sel: '#1e3a6e', btn: '#22304a', 'btn-hover': '#2d3f5f', head: '#1a2740', dark: true },
+  'Dark Purple': { bg: '#16111f', card: '#201830', border: '#3b2d57', text: '#f3eefc', muted: '#a89bc2', accent: '#a78bfa', 'accent-dk': '#8b5cf6', 'on-accent': '#1b1030', danger: '#f87171', sel: '#3b2a6b', btn: '#33284a', 'btn-hover': '#443763', head: '#2a2040', dark: true },
+  'Dark Orange': { bg: '#18120d', card: '#241b14', border: '#43332a', text: '#faf3ec', muted: '#b8a596', accent: '#fb923c', 'accent-dk': '#f97316', 'on-accent': '#2a1405', danger: '#f87171', sel: '#5a3412', btn: '#3a2c22', 'btn-hover': '#4d3a2d', head: '#2f241b', dark: true }
+};
+const THEME_KEYS = ['bg', 'card', 'border', 'text', 'muted', 'accent', 'accent-dk', 'on-accent', 'danger', 'sel', 'btn', 'btn-hover', 'head'];
+let themeName = 'Auto';
+function applyTheme(name) {
+  const root = document.documentElement;
+  themeName = THEMES[name] ? name : 'Auto';
+  if (themeName === 'Auto') {
+    THEME_KEYS.forEach(k => root.style.removeProperty('--' + k));
+    root.style.removeProperty('color-scheme');
+  } else {
+    const t = THEMES[themeName];
+    THEME_KEYS.forEach(k => root.style.setProperty('--' + k, t[k]));
+    root.style.setProperty('color-scheme', t.dark ? 'dark' : 'light');
+  }
+  const meta = $('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim() || '#f3f4f6');
+  try { localStorage.setItem('oc-theme', themeName); } catch {}
+}
+function swatchOf(name) {
+  if (name === 'Auto') return 'linear-gradient(135deg, #f3f4f6 50%, #0b1220 50%)';
+  return THEMES[name].accent;
+}
+try { applyTheme(localStorage.getItem('oc-theme') || 'Auto'); } catch { applyTheme('Auto'); }
+
+/* ===================================================================== storage */
+const Store = {
+  mode: 'idb', db: null, names: ['meta', 'files', 'hidden', 'fdata', 'hdata'],
+  mem: {},
+  async init() {
+    this.names.forEach(n => (this.mem[n] = new Map()));
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('open-cheyyaku', 1);
+        r.onupgradeneeded = () => {
+          const d = r.result;
+          d.createObjectStore('meta', { keyPath: 'k' });
+          ['files', 'hidden', 'fdata', 'hdata'].forEach(n => d.createObjectStore(n, { keyPath: 'id' }));
+        };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+        r.onblocked = () => rej(new Error('blocked'));
+      });
+    } catch { this.mode = 'memory'; }
+  },
+  keyOf(store, v) { return store === 'meta' ? v.k : v.id; },
+  req(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const tx = this.db.transaction(store, mode);
+      let out;
+      const r = fn(tx.objectStore(store));
+      if (r) r.onsuccess = () => { out = r.result; };
+      tx.oncomplete = () => res(out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error || new Error('aborted'));
+    });
+  },
+  async get(store, k) { return this.mode === 'memory' ? this.mem[store].get(k) : this.req(store, 'readonly', s => s.get(k)); },
+  async put(store, v) { if (this.mode === 'memory') { this.mem[store].set(this.keyOf(store, v), v); return; } await this.req(store, 'readwrite', s => s.put(v)); },
+  async del(store, k) { if (this.mode === 'memory') { this.mem[store].delete(k); return; } await this.req(store, 'readwrite', s => s.delete(k)); },
+  async all(store) { return this.mode === 'memory' ? [...this.mem[store].values()] : this.req(store, 'readonly', s => s.getAll()); },
+  async count(store) { return this.mode === 'memory' ? this.mem[store].size : this.req(store, 'readonly', s => s.count()); },
+  async wipe() {
+    this.names.forEach(n => this.mem[n].clear());
+    if (this.db) { this.db.close(); this.db = null; }
+    await new Promise(res => {
+      try { const r = indexedDB.deleteDatabase('open-cheyyaku'); r.onsuccess = r.onerror = r.onblocked = () => res(); } catch { res(); }
+    });
+    this.mode = 'memory';
+  }
+};
+
+/* ===================================================================== crypto + vault */
+const ITER = 600000, MIN_PW = 4, MAX_FILE = 200 * 1024 * 1024;
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function deriveKey(secret, salt, iter) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function seal(key, u8) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, u8));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return out;
+}
+async function unseal(key, u8) { return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: u8.subarray(0, 12) }, key, u8.subarray(12))); }
+const dataKey = raw => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function newRecoveryKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(15)); let bits = 0, val = 0, out = '';
+  for (const b of bytes) { val = (val << 8) | b; bits += 8; while (bits >= 5) { out += B32[(val >>> (bits - 5)) & 31]; bits -= 5; } }
+  return out.match(/.{4}/g).join('-');
+}
+const normRecovery = k => k.replace(/[-\s]/g, '').toUpperCase();
+const randomId = () => [...crypto.getRandomValues(new Uint8Array(12))].map(b => b.toString(16).padStart(2, '0')).join('');
+const bytesEqual = (a, b) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+
+const V = {
+  meta: null, filesKey: null, hiddenKey: null,
+  async load() { this.meta = (await Store.get('meta', 'vault')) || null; },
+  exists() { return !!this.meta; },
+  get unlocked() { return !!this.filesKey; },
+  get hiddenUnlocked() { return !!this.hiddenKey; },
+  checkPasswords(main, hidden) {
+    if (main.length < MIN_PW || hidden.length < MIN_PW) throw new Error(`Passwords need at least ${MIN_PW} characters.`);
+    if (main === hidden) throw new Error('The hidden-files password must be different from the main password.');
+  },
+  async wrapAll(main, hidden, filesRaw, hiddenRaw, recovery) {
+    const pwSalt = crypto.getRandomValues(new Uint8Array(16)), hidSalt = crypto.getRandomValues(new Uint8Array(16));
+    const meta = { k: 'vault', version: 1, iterations: ITER,
+      pw_salt: b64(pwSalt), pw_wrapped: b64(await seal(await deriveKey(main, pwSalt, ITER), filesRaw)),
+      hid_salt: b64(hidSalt), hid_wrapped: b64(await seal(await deriveKey(hidden, hidSalt, ITER), hiddenRaw)) };
+    if (recovery) {
+      const recSalt = crypto.getRandomValues(new Uint8Array(16));
+      const bundle = enc.encode(JSON.stringify({ files: b64(filesRaw), hidden: b64(hiddenRaw) }));
+      meta.rec_salt = b64(recSalt);
+      meta.rec_wrapped = b64(await seal(await deriveKey(normRecovery(recovery), recSalt, ITER), bundle));
+    }
+    return meta;
+  },
+  async create(main, hidden) {
+    this.checkPasswords(main, hidden);
+    const filesRaw = crypto.getRandomValues(new Uint8Array(32)), hiddenRaw = crypto.getRandomValues(new Uint8Array(32));
+    const recovery = newRecoveryKey();
+    this.meta = await this.wrapAll(main, hidden, filesRaw, hiddenRaw, recovery);
+    await Store.put('meta', this.meta);
+    this.filesKey = await dataKey(filesRaw); this.hiddenKey = null;
+    return recovery;
+  },
+  async tryOpen(secret, saltField, wrappedField) {
+    const m = this.meta;
+    try { return await unseal(await deriveKey(secret, unb64(m[saltField]), m.iterations), unb64(m[wrappedField])); } catch { return null; }
+  },
+  async unlock(pw) { const raw = await this.tryOpen(pw, 'pw_salt', 'pw_wrapped'); if (!raw) return false; this.filesKey = await dataKey(raw); return true; },
+  async unlockHidden(pw) { const raw = await this.tryOpen(pw, 'hid_salt', 'hid_wrapped'); if (!raw) return false; this.hiddenKey = await dataKey(raw); return true; },
+  async checkRecovery(k) { return !!(await this.tryOpen(normRecovery(k), 'rec_salt', 'rec_wrapped')); },
+  async resetWithRecovery(k, newMain, newHidden) {
+    this.checkPasswords(newMain, newHidden);
+    const raw = await this.tryOpen(normRecovery(k), 'rec_salt', 'rec_wrapped');
+    if (!raw) return false;
+    const keys = JSON.parse(dec.decode(raw));
+    const meta = await this.wrapAll(newMain, newHidden, unb64(keys.files), unb64(keys.hidden), null);
+    meta.rec_salt = this.meta.rec_salt; meta.rec_wrapped = this.meta.rec_wrapped;   // recovery key stays valid
+    this.meta = meta; await Store.put('meta', meta); this.lock();
+    return true;
+  },
+  lock() { this.filesKey = null; this.hiddenKey = null; },
+  lockHidden() { this.hiddenKey = null; },
+  stores(hidden) { return hidden ? ['hidden', 'hdata', this.hiddenKey] : ['files', 'fdata', this.filesKey]; },
+  need(hidden) { const [h1, d1, key] = this.stores(hidden); if (!key) throw new Error(hidden ? 'Hidden files are locked.' : 'Vault is locked.'); return [h1, d1, key]; },
+  hiddenCount() { return Store.count('hidden'); },
+
+  async add(file, hidden) {
+    const [hs, ds, key] = this.need(hidden);
+    if (file.size > MAX_FILE) throw new Error(`too big for the phone version (limit ${humanSize(MAX_FILE)})`);
+    const data = new Uint8Array(await file.arrayBuffer());
+    const id = randomId();
+    const head = await seal(key, enc.encode(JSON.stringify({ name: file.name, type: file.type || '', size: data.length, added: Date.now() })));
+    await Store.put(ds, { id, data: await seal(key, data) });
+    await Store.put(hs, { id, head });
+    const back = await unseal(key, (await Store.get(ds, id)).data);   // verify before reporting success
+    if (!bytesEqual(back, data)) { await Store.del(hs, id); await Store.del(ds, id); throw new Error('could not verify the stored copy'); }
+    return id;
+  },
+  async list(hidden) {
+    const [hs, , key] = this.need(hidden);
+    const out = [];
+    for (const rec of await Store.all(hs)) {
+      const m = JSON.parse(dec.decode(await unseal(key, rec.head)));
+      out.push({ id: rec.id, name: m.name, type: m.type, size: m.size, added: m.added });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  },
+  async read(id, hidden) {
+    const [hs, ds, key] = this.need(hidden);
+    const m = JSON.parse(dec.decode(await unseal(key, (await Store.get(hs, id)).head)));
+    return { ...m, data: await unseal(key, (await Store.get(ds, id)).data) };
+  },
+  async update(id, hidden, data) {
+    const [hs, ds, key] = this.need(hidden);
+    const m = JSON.parse(dec.decode(await unseal(key, (await Store.get(hs, id)).head)));
+    m.size = data.length;
+    await Store.put(ds, { id, data: await seal(key, data) });
+    await Store.put(hs, { id, head: await seal(key, enc.encode(JSON.stringify(m))) });
+  },
+  async move(id, toHidden) {
+    const [sh, sd] = this.need(!toHidden), [dh, dd, dkey] = this.need(toHidden);
+    const f = await this.read(id, !toHidden);
+    const { data, ...m } = f;
+    await Store.put(dd, { id, data: await seal(dkey, data) });
+    await Store.put(dh, { id, head: await seal(dkey, enc.encode(JSON.stringify(m))) });
+    const back = await unseal(dkey, (await Store.get(dd, id)).data);
+    if (!bytesEqual(back, data)) { await Store.del(dh, id); await Store.del(dd, id); throw new Error('move could not be verified; nothing changed'); }
+    await Store.del(sh, id); await Store.del(sd, id);
+  },
+  async remove(id, hidden) { const [hs, ds] = this.need(hidden); await Store.del(hs, id); await Store.del(ds, id); },
+
+  /* whole-vault backup: encrypted records exactly as stored, so it needs the same passwords */
+  async backup() {
+    const records = [], chunks = [];
+    for (const [hs, ds] of [['files', 'fdata'], ['hidden', 'hdata']]) {
+      for (const r of await Store.all(hs)) {
+        const d = await Store.get(ds, r.id);
+        records.push({ s: hs, id: r.id, hl: r.head.length, dl: d.data.length });
+        chunks.push(r.head, d.data);
+      }
+    }
+    const header = enc.encode('OCBK1\n' + JSON.stringify({ meta: this.meta, records }) + '\n');
+    return new Blob([header, ...chunks], { type: 'application/octet-stream' });
+  },
+  async restoreBackup(file) {
+    if (this.exists()) throw new Error('A vault already exists on this phone.');
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const nl1 = buf.indexOf(10);
+    if (dec.decode(buf.subarray(0, nl1)) !== 'OCBK1') throw new Error('This is not an Open Cheyyaku backup file.');
+    const nl2 = buf.indexOf(10, nl1 + 1);
+    const hdr = JSON.parse(dec.decode(buf.subarray(nl1 + 1, nl2)));
+    if (!hdr.meta || hdr.meta.k !== 'vault' || !Array.isArray(hdr.records)) throw new Error('The backup file is damaged.');
+    let pos = nl2 + 1;
+    for (const r of hdr.records) {
+      if (!['files', 'hidden'].includes(r.s) || pos + r.hl + r.dl > buf.length) throw new Error('The backup file is damaged.');
+      const head = buf.slice(pos, pos + r.hl), data = buf.slice(pos + r.hl, pos + r.hl + r.dl); pos += r.hl + r.dl;
+      await Store.put(r.s === 'files' ? 'fdata' : 'hdata', { id: r.id, data });
+      await Store.put(r.s, { id: r.id, head });
+    }
+    await Store.put('meta', hdr.meta); this.meta = hdr.meta;
+    return hdr.records.length;
+  },
+  async erase() {
+    this.lock(); this.meta = null;
+    await Store.wipe();
+    try { localStorage.clear(); sessionStorage.clear(); } catch {}
+    try { if (window.caches) for (const k of await caches.keys()) await caches.delete(k); } catch {}
+    try { if (navigator.serviceWorker) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister(); } catch {}
+  }
+};
+
+/* ===================================================================== dialogs */
+// Native append() prints null/false as the words "null"/"false", so skip empty values.
+function safeAppend(el) {
+  const native = el.append.bind(el);
+  el.append = (...kids) => native(...kids.flat().filter(k => k != null && k !== false));
+  return el;
+}
+function modal(build, { dismiss = true } = {}) {
+  return new Promise(resolve => {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const scrim = h('div', { class: 'scrim' });
+    const box = safeAppend(h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }));
+    const onKey = e => { if (e.key === 'Escape' && dismiss) close(null); };
+    const close = v => { document.removeEventListener('keydown', onKey); scrim.remove(); resolve(v); };
+    scrim.addEventListener('pointerdown', e => { if (e.target === scrim && dismiss) close(null); });
+    document.addEventListener('keydown', onKey);
+    scrim.append(box); document.body.append(scrim);
+    build(box, close);
+    const first = box.querySelector('input:not([type=checkbox]), .btn.primary');
+    if (first) first.focus({ preventScroll: true });
+  });
+}
+function askPassword({ title, prompt, confirm = false, verify = null, mask = true, okText = 'OK' }) {
+  return modal((box, close) => {
+    const mk = () => h('input', { class: 'field', type: mask ? 'password' : 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'done' });
+    const e1 = mk(), e2 = confirm ? mk() : null;
+    const err = h('p', { class: 'error', role: 'alert' });
+    const ok = h('button', { class: 'btn primary', type: 'button', text: okText });
+    const show = h('input', { type: 'checkbox', id: 'showpw' });
+    show.addEventListener('change', () => { const t = show.checked ? 'text' : 'password'; e1.type = t; if (e2) e2.type = t; });
+    async function submit() {
+      const v = e1.value;
+      err.textContent = '';
+      if (!v) { err.textContent = 'Please type it in.'; return; }
+      if (e2 && v !== e2.value) { err.textContent = 'The two entries do not match.'; return; }
+      ok.disabled = true; ok.textContent = 'Checking…';
+      let msg = null;
+      try { if (verify) msg = await verify(v); } catch (e) { msg = e.message; }
+      ok.disabled = false; ok.textContent = okText;
+      if (msg) { err.textContent = msg; e1.value = ''; if (e2) e2.value = ''; e1.focus(); return; }
+      close(v);
+    }
+    ok.addEventListener('click', submit);
+    [e1, e2].forEach(e => e && e.addEventListener('keydown', ev => { if (ev.key === 'Enter') submit(); }));
+    box.append(h('h2', { text: title }), h('p', { text: prompt }), e1,
+      e2 && h('label', { class: 'field-label', text: 'Type it again to confirm' }), e2, err,
+      mask && h('label', { class: 'check-row', for: 'showpw' }, show, 'Show password'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: () => close(null) }), ok));
+  });
+}
+function choose({ title, text, options }) {   // options: [{label, value, kind}]
+  return modal((box, close) => {
+    box.append(h('h2', { text: title }), text && h('p', { text }),
+      h('div', { class: 'actions', style: 'flex-direction:column' },
+        options.map(o => h('button', { class: 'btn ' + (o.kind || ''), type: 'button', text: o.label, onclick: () => close(o.value) }))));
+  });
+}
+function showRecovery(key) {
+  return modal((box, close) => {
+    const note = h('p', { class: 'muted', style: 'margin:10px 0 0;min-height:20px' });
+    box.append(h('h2', { text: 'Your recovery key' }),
+      h('p', { text: 'Write it down and keep it safe. It is the ONLY way to reset forgotten passwords, and it is shown just this once.' }),
+      h('div', { class: 'recovery', text: key }), note,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn', type: 'button', text: 'Copy', onclick: async () => {
+          try { await navigator.clipboard.writeText(key); note.textContent = 'Copied.'; } catch { note.textContent = 'Press and hold the key to copy it.'; } } }),
+        h('button', { class: 'btn', type: 'button', text: 'Save file', onclick: () => { saveBytes('open-cheyyaku-recovery-key.txt', enc.encode(`${APP_NAME} recovery key:\n${key}\n`), 'text/plain'); note.textContent = 'Saved to Downloads. Keep it away from your phone vault.'; } })),
+      h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', text: 'I saved it', onclick: () => close(true) })));
+  }, { dismiss: false });
+}
+
+/* ===================================================================== app state */
+const app = $('#app');
+const ui = { tab: 'files', sel: new Set(), items: { files: [], hidden: [] }, q: '', installEvt: null, hiddenAt: 0 };
+const shortPw = p => (p.length < MIN_PW ? `Use at least ${MIN_PW} characters.` : null);
+
+async function refreshItems() {
+  ui.items.files = V.unlocked ? await V.list(false) : [];
+  ui.items.hidden = V.hiddenUnlocked ? await V.list(true) : [];
+}
+
+/* ===================================================================== lock screen */
+function themeSelect() {
+  const sel = h('select', { class: 'field', id: 'theme-select', 'aria-label': 'Theme' },
+    ['Auto', ...Object.keys(THEMES)].map(n => h('option', { value: n, text: n === 'Auto' ? 'Auto (follow phone)' : n, selected: n === themeName })));
+  sel.addEventListener('change', () => applyTheme(sel.value));
+  return h('div', { class: 'theme-row' }, 'Theme', sel);
+}
+function renderLock(note) {
+  ui.sel.clear();
+  const exists = V.exists();
+  const standalone = window.matchMedia && matchMedia('(display-mode: standalone)').matches;
+  app.replaceChildren(h('main', { class: 'lock' },
+    h('div', { class: 'logo' }, icon('lock')),
+    h('h1', { text: APP_NAME }),
+    h('p', { text: 'Your files, locked behind a password.' }),
+    Store.mode === 'memory' && h('div', { class: 'banner', role: 'alert', text: 'This browser is blocking storage, so files will be lost when you close the page. Open the app in Chrome to keep them.' }),
+    note && h('div', { class: 'banner', text: note }),
+    h('div', { class: 'stack' },
+      h('button', { class: 'btn primary wide', id: 'main-btn', type: 'button', text: exists ? 'Unlock vault' : 'Create vault', onclick: exists ? doUnlock : doCreate }),
+      exists && h('button', { class: 'link', type: 'button', text: 'Forgot password?', onclick: doForgot }),
+      !exists && h('button', { class: 'link', type: 'button', text: 'Restore from backup', onclick: doRestore }),
+      exists && h('button', { class: 'link', type: 'button', id: 'erase-btn', text: 'Uninstall / erase app data…', onclick: doErase }),
+      ui.installEvt && !standalone && h('button', { class: 'btn wide', id: 'install-btn', type: 'button', onclick: doInstall }, icon('install'), 'Install app on this phone')),
+    themeSelect()));
+}
+async function doInstall() {
+  const ev = ui.installEvt; if (!ev) return;
+  ev.prompt(); try { await ev.userChoice; } catch {}
+  ui.installEvt = null; renderLock();
+}
+async function doCreate() {
+  const main = await askPassword({ title: 'Create vault', prompt: 'Step 1 of 2: create the password for your FILES.', confirm: true, verify: shortPw });
+  if (main == null) return;
+  const hid = await askPassword({ title: 'Create vault', prompt: 'Step 2 of 2: create a DIFFERENT password for your HIDDEN files.', confirm: true,
+    verify: p => shortPw(p) || (p === main ? 'This must be different from your main password.' : null) });
+  if (hid == null) return;
+  const done = busy('Creating vault…');
+  let key;
+  try { key = await V.create(main, hid); } catch (e) { done(); toast(e.message); return; }
+  done();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
+  await showRecovery(key);
+  await enterVault();
+}
+async function doUnlock() {
+  const pw = await askPassword({ title: 'Unlock vault', prompt: 'Enter your password.', okText: 'Unlock',
+    verify: async p => ((await V.unlock(p)) ? null : 'Wrong password. Try again.') });
+  if (pw == null) return;
+  await enterVault();
+}
+async function doForgot() {
+  const key = await askPassword({ title: 'Forgot password', prompt: 'Enter your recovery key.', mask: false, okText: 'Continue',
+    verify: async k => ((await V.checkRecovery(k)) ? null : 'That recovery key is not correct.') });
+  if (key == null) return;
+  const m = await askPassword({ title: 'New password', prompt: 'Choose a NEW password for your FILES.', confirm: true, verify: shortPw });
+  if (m == null) return;
+  const hd = await askPassword({ title: 'New hidden-files password', prompt: 'Choose a NEW, DIFFERENT password for your HIDDEN files.', confirm: true,
+    verify: p => shortPw(p) || (p === m ? 'This must be different from your main password.' : null) });
+  if (hd == null) return;
+  const done = busy('Saving…');
+  try { await V.resetWithRecovery(key, m, hd); toast('Passwords changed. Unlock with your new password.'); } catch (e) { toast(e.message); }
+  done(); renderLock();
+}
+async function doRestore() {
+  const inp = h('input', { type: 'file', accept: '.ocbk,application/octet-stream' });
+  inp.addEventListener('change', async () => {
+    if (!inp.files[0]) return;
+    const done = busy('Restoring…');
+    try { const n = await V.restoreBackup(inp.files[0]); done(); renderLock(`Restored ${n} file(s). Unlock with the passwords you used for that vault.`); }
+    catch (e) { done(); toast(e.message); }
+  });
+  inp.click();
+}
+
+/* ===================================================================== vault screen */
+async function enterVault() {
+  ui.tab = 'files'; ui.q = ''; ui.sel.clear();
+  await refreshItems();
+  renderVault();
+}
+function lockVault() {
+  closeViewer(); V.lock(); ui.items = { files: [], hidden: [] }; ui.sel.clear(); renderLock();
+}
+function renderVault() {
+  const search = h('input', { class: 'field search', id: 'search', type: 'search', placeholder: 'Search files', 'aria-label': 'Search files', value: ui.q });
+  search.addEventListener('input', () => { ui.q = search.value; renderList(); });
+  const tabBtn = (key, label) => h('button', { class: 'tab', role: 'tab', 'data-tab': key, 'aria-selected': String(ui.tab === key), onclick: () => switchTab(key) }, label);
+  app.replaceChildren(
+    h('header', { class: 'top' },
+      h('div', { class: 'top-row' }, h('h1', { text: APP_NAME }),
+        h('button', { class: 'icon-btn', id: 'settings-btn', 'aria-label': 'Settings', onclick: openSettings }, icon('gear')),
+        h('button', { class: 'icon-btn', id: 'lock-btn', 'aria-label': 'Lock vault', onclick: lockVault }, icon('lock'))),
+      h('div', { class: 'tabs', role: 'tablist' }, tabBtn('files', h('span', { id: 'tab-files' })), tabBtn('hidden', h('span', { id: 'tab-hidden' }))),
+      search),
+    h('main', { id: 'list-host' }),
+    h('button', { class: 'fab', id: 'fab', 'aria-label': 'Add files', onclick: () => addFiles() }, icon('plus')),
+    h('div', { class: 'selbar', id: 'selbar', hidden: true }));
+  renderList(); renderBars();
+}
+function currentHidden() { return ui.tab === 'hidden'; }
+function switchTab(key) {
+  if (ui.tab === key) return;
+  ui.tab = key; ui.sel.clear(); ui.q = ''; const s = $('#search'); if (s) s.value = '';
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === key)));
+  renderList(); renderBars();
+}
+async function revealHidden() {
+  if (V.hiddenUnlocked) return true;
+  const pw = await askPassword({ title: 'Hidden files', prompt: 'Enter the password for your HIDDEN files.', okText: 'Show',
+    verify: async p => ((await V.unlockHidden(p)) ? null : 'Wrong password. Try again.') });
+  if (pw == null) return false;
+  await refreshItems(); renderList(); renderBars();
+  return true;
+}
+function renderBars() {
+  const f = $('#tab-files'), hd = $('#tab-hidden'); if (!f) return;
+  f.textContent = `Files ${ui.items.files.length}`;
+  hd.replaceChildren(V.hiddenUnlocked ? `Hidden ${ui.items.hidden.length}` : h('span', { style: 'display:inline-flex;align-items:center;gap:6px' }, icon('lock'), 'Hidden'));
+  const n = ui.sel.size, bar = $('#selbar'), fab = $('#fab');
+  bar.hidden = n === 0; fab.hidden = n > 0 || (currentHidden() && !V.hiddenUnlocked);
+  if (n === 0) { bar.replaceChildren(); return; }
+  const act = (label, ic, fn, cls, id) => h('button', { class: cls || '', id, type: 'button', onclick: fn }, icon(ic), label);
+  bar.replaceChildren(h('div', { class: 'selbar-in' },
+    h('div', { class: 'selcount' }, h('span', { text: `${n} selected` }), h('button', { class: 'link', type: 'button', id: 'sel-clear', text: 'Clear', onclick: () => { ui.sel.clear(); renderList(); renderBars(); } })),
+    h('div', { class: 'selactions' },
+      act('Open', 'open', () => openFile([...ui.sel][0]), '', 'act-open'),
+      act('Remove', 'out', () => removeFromVault([...ui.sel]), '', 'act-remove'),
+      act(currentHidden() ? 'Unhide' : 'Hide', currentHidden() ? 'eye' : 'eyeoff', () => moveItems([...ui.sel], !currentHidden()), '', 'act-move'),
+      act('Delete', 'trash', () => deleteItems([...ui.sel]), 'danger', 'act-delete'))));
+  const openBtn = $('#act-open'); if (openBtn) openBtn.style.visibility = n === 1 ? 'visible' : 'hidden';
+}
+function renderList() {
+  const host = $('#list-host'); if (!host) return;
+  const hidden = currentHidden();
+  if (hidden && !V.hiddenUnlocked) {
+    host.replaceChildren(h('div', { class: 'locked-card' }, h('strong', { text: 'Hidden files are locked' }), h('p', { text: 'They need their own password.' }),
+      h('button', { class: 'btn primary', id: 'reveal-btn', type: 'button', text: 'Show hidden files', onclick: revealHidden })));
+    return;
+  }
+  const q = ui.q.trim().toLowerCase();
+  const items = ui.items[hidden ? 'hidden' : 'files'].filter(it => it.name.toLowerCase().includes(q));
+  ui.sel.forEach(id => { if (!items.some(i => i.id === id)) ui.sel.delete(id); });
+  const ul = h('ul', { class: 'list', role: 'listbox', 'aria-multiselectable': 'true' });
+  if (!items.length) {
+    host.replaceChildren(h('div', { class: 'empty' },
+      h('strong', { text: q ? 'No matching files' : hidden ? 'No hidden files yet' : 'No files yet' }),
+      q ? 'Try a different name.' : 'Tap the + button to add files.',
+      hidden && !q && h('div', { style: 'margin-top:14px' }, h('button', { class: 'link', type: 'button', text: 'Hide again', onclick: hideAgain }))));
+    return;
+  }
+  for (const it of items) ul.append(rowFor(it));
+  host.replaceChildren(...[ul, hidden && h('div', { style: 'text-align:center' }, h('button', { class: 'link', id: 'hide-again', type: 'button', text: 'Hide these files again', onclick: hideAgain }))].filter(Boolean));
+}
+function hideAgain() {
+  V.lockHidden(); ui.items.hidden = []; ui.sel.clear(); renderList(); renderBars(); toast('Hidden files are locked again.');
+}
+function rowFor(it) {
+  const selected = ui.sel.has(it.id);
+  let timer = null, sx = 0, sy = 0, longDone = false;
+  const row = h('li', { class: 'row', role: 'option', 'data-id': it.id, 'aria-selected': String(selected), tabindex: '0' },
+    h('span', { class: 'tick' }, icon('check')),
+    h('span', { class: 'badge', text: (ext(it.name) || 'file').slice(0, 4).toUpperCase() }),
+    h('div', { class: 'info' }, h('div', { class: 'name', text: it.name }), h('div', { class: 'meta', text: `${humanSize(it.size)} · ${fmtDate(it.added)}` })),
+    h('button', { class: 'icon-btn more', 'aria-label': `Options for ${it.name}`, onclick: e => { e.stopPropagation(); openMenuFor(it.id); } }, icon('dots')));
+  const toggle = () => {
+    if (ui.sel.has(it.id)) ui.sel.delete(it.id); else ui.sel.add(it.id);
+    row.setAttribute('aria-selected', String(ui.sel.has(it.id))); renderBars();
+  };
+  row.addEventListener('click', () => { if (longDone) { longDone = false; return; } toggle(); });
+  row.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+  row.addEventListener('dblclick', () => openFile(it.id));
+  row.addEventListener('pointerdown', e => {
+    if (e.target.closest('.more')) return;
+    sx = e.clientX; sy = e.clientY; longDone = false;
+    timer = setTimeout(() => { longDone = true; openMenuFor(it.id); }, 550);
+  });
+  const cancel = () => clearTimeout(timer);
+  row.addEventListener('pointermove', e => { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 10) cancel(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => row.addEventListener(t, cancel));
+  row.addEventListener('contextmenu', e => { e.preventDefault(); if (!longDone) { longDone = true; cancel(); openMenuFor(it.id); } });
+  return row;
+}
+
+/* ===================================================================== file actions */
+function targetsFor(id) {   // long-press / menu: act on the selection if the row is in it, otherwise just that row
+  if (!ui.sel.has(id)) { ui.sel = new Set([id]); document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-selected', String(r.dataset.id === id))); renderBars(); }
+  return [...ui.sel];
+}
+async function openMenuFor(id) {
+  const ids = targetsFor(id), hidden = currentHidden(), many = ids.length > 1;
+  const it = ui.items[hidden ? 'hidden' : 'files'].find(i => i.id === id);
+  const canShare = !!navigator.canShare && !many;
+  const choice = await modal((box, close) => {
+    const b = (label, ic, value, cls) => h('button', { type: 'button', class: cls || '', 'data-act': value, onclick: () => close(value) }, icon(ic), label);
+    box.append(h('div', { class: 'menu-title', text: many ? `${ids.length} files selected` : it.name }),
+      h('div', { class: 'menu' },
+        !many && b('Open', 'open', 'open'),
+        b('Remove from vault', 'out', 'remove'),
+        b('Save a copy', 'copy', 'copy'),
+        canShare && b('Share / open in another app', 'share', 'share'),
+        h('div', { class: 'sep' }),
+        hidden ? b('Move back to Files', 'eye', 'unhide') : b('Move to Hidden files', 'eyeoff', 'hide'),
+        h('div', { class: 'sep' }),
+        b('Delete permanently', 'trash', 'delete', 'danger')));
+  });
+  if (!choice) return;
+  ({ open: () => openFile(ids[0]), remove: () => removeFromVault(ids), copy: () => saveCopies(ids), share: () => shareFile(ids[0]),
+    hide: () => moveItems(ids, true), unhide: () => moveItems(ids, false), delete: () => deleteItems(ids) })[choice]();
+}
+async function addFiles() {
+  const hidden = currentHidden();
+  if (hidden && !(await revealHidden())) return;
+  const inp = $('#file-input'); inp.value = '';
+  inp.onchange = async () => {
+    const files = [...inp.files]; if (!files.length) return;
+    const done = busy(`Encrypting ${files.length} file(s)…`);
+    let n = 0; const errors = [];
+    for (const f of files) { try { await V.add(f, hidden); n++; } catch (e) { errors.push(`${f.name}: ${e.message}`); } }
+    done(); await refreshItems(); renderList(); renderBars();
+    if (errors.length) await choose({ title: 'Some files had a problem', text: errors.join('\n'), options: [{ label: 'OK', value: 1, kind: 'primary' }] });
+    else toast(n ? `Added ${n} file(s). The originals are still on your phone: delete them yourself if you want them gone.` : 'Nothing added.');
+  };
+  inp.click();
+}
+let viewerUrl = null;
+function closeViewer() { const v = $('.viewer'); if (v) v.remove(); if (viewerUrl) { URL.revokeObjectURL(viewerUrl); viewerUrl = null; } }
+async function openFile(id) {
+  const hidden = currentHidden();
+  closeViewer();   // must happen before the new blob URL is created (closing revokes the previous one)
+  let f; try { f = await V.read(id, hidden); } catch (e) { toast(e.message); return; }
+  const type = mimeOf(f.name, f.type);
+  const blobUrl = () => (viewerUrl = URL.createObjectURL(new Blob([f.data], { type })));
+  let body;
+  if (type.startsWith('image/')) body = h('img', { src: blobUrl(), alt: f.name });
+  else if (type.startsWith('video/')) body = h('video', { src: blobUrl(), controls: true, playsinline: true });
+  else if (type.startsWith('audio/')) body = h('audio', { src: blobUrl(), controls: true });
+  else if (type.startsWith('text/') || type === 'application/json') body = h('pre', { text: dec.decode(f.data.subarray(0, 300000)) });
+  else {
+    const canShare = !!navigator.canShare && navigator.canShare({ files: [new File([f.data], f.name, { type })] });
+    const choice = await choose({ title: f.name, text: 'This type of file cannot be shown inside the app.',
+      options: [canShare && { label: 'Open in another app', value: 'share', kind: 'primary' }, { label: 'Save a copy to Downloads', value: 'save' }, { label: 'Cancel', value: null }].filter(Boolean) });
+    if (choice === 'share') shareFile(id); else if (choice === 'save') saveCopies([id]);
+    return;
+  }
+  document.body.append(h('div', { class: 'viewer', role: 'dialog', 'aria-label': f.name },
+    h('div', { class: 'viewer-bar' }, h('div', { class: 't', text: f.name }), h('button', { class: 'icon-btn', id: 'viewer-close', 'aria-label': 'Close', onclick: closeViewer }, icon('close'))),
+    h('div', { class: 'viewer-body' }, body)));
+}
+async function shareFile(id) {
+  try {
+    const f = await V.read(id, currentHidden());
+    await navigator.share({ files: [new File([f.data], f.name, { type: mimeOf(f.name, f.type) })], title: f.name });
+  } catch (e) { if (e.name !== 'AbortError') toast('Sharing is not available here. Use "Save a copy" instead.'); }
+}
+async function saveCopies(ids) {
+  const hidden = currentHidden(); let n = 0;
+  for (const id of ids) { try { const f = await V.read(id, hidden); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); n++; await sleep(450); } catch (e) { toast(e.message); } }
+  if (n) toast(`Saved ${n} file(s) to your Downloads folder.`);
+}
+async function removeFromVault(ids) {
+  const hidden = currentHidden(); const sent = [];
+  for (const id of ids) { try { const f = await V.read(id, hidden); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); sent.push(id); await sleep(450); } catch (e) { toast(e.message); } }
+  if (!sent.length) return;
+  // A web page cannot see whether the download finished, so ask before deleting anything.
+  const ans = await choose({ title: `Delete ${sent.length} file(s) from the vault?`,
+    text: 'Android saves them in your Downloads folder (a web app cannot choose the original folder). Check that they are there, then delete them from the vault.',
+    options: [{ label: 'Yes, delete from vault', value: 'yes', kind: 'primary' }, { label: 'No, keep them in the vault', value: 'no' }] });
+  if (ans === 'yes') { for (const id of sent) await V.remove(id, hidden); toast(`Removed ${sent.length} file(s) from the vault.`); }
+  ui.sel.clear(); await refreshItems(); renderList(); renderBars();
+}
+async function moveItems(ids, toHidden) {
+  if (!(await revealHidden())) return;
+  let n = 0;
+  for (const id of ids) { try { await V.move(id, toHidden); n++; } catch (e) { toast(e.message); } }
+  ui.sel.clear(); await refreshItems(); renderList(); renderBars();
+  toast(`Moved ${n} file(s) ${toHidden ? 'to Hidden files' : 'back to Files'}.`);
+}
+async function deleteItems(ids) {
+  const hidden = currentHidden();
+  const ans = await choose({ title: `Delete ${ids.length} file(s)?`, text: 'This permanently deletes them from the vault and cannot be undone.',
+    options: [{ label: 'Delete permanently', value: 'yes', kind: 'danger' }, { label: 'Cancel', value: null }] });
+  if (ans !== 'yes') return;
+  for (const id of ids) await V.remove(id, hidden);
+  ui.sel.clear(); await refreshItems(); renderList(); renderBars(); toast(`Deleted ${ids.length} file(s).`);
+}
+
+/* ===================================================================== settings / backup / erase */
+async function openSettings() {
+  const choice = await modal((box, close) => {
+    box.append(h('h2', { text: 'Settings' }), h('p', { text: 'Theme' }),
+      h('div', { class: 'themes' }, ['Auto', ...Object.keys(THEMES)].map(n =>
+        h('button', { class: 'theme-opt', type: 'button', 'data-theme-name': n, 'aria-pressed': String(themeName === n),
+          onclick: e => { applyTheme(n); box.querySelectorAll('.theme-opt').forEach(b => b.setAttribute('aria-pressed', String(b === e.currentTarget))); } },
+          h('span', { class: 'swatch', style: `background:${swatchOf(n)}` }), n === 'Auto' ? 'Auto' : n))),
+      h('div', { class: 'menu' },
+        h('button', { type: 'button', id: 'backup-btn', onclick: () => close('backup') }, icon('out'), 'Back up vault to a file'),
+        V.hiddenUnlocked && h('button', { type: 'button', onclick: () => close('hide') }, icon('eyeoff'), 'Lock hidden files now')),
+      h('p', { style: 'margin:14px 0 0;font-size:14px' }, 'Your files live inside this browser on this phone. If you clear Chrome\'s site data, or uninstall Chrome, the vault is lost. Back it up now and then.'),
+      h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', text: 'Done', onclick: () => close('done') })));
+  });
+  if (choice === 'backup') {
+    const done = busy('Preparing backup…');
+    try { const blob = await V.backup(); const d = new Date().toISOString().slice(0, 10); saveBytes(`open-cheyyaku-backup-${d}.ocbk`, blob, 'application/octet-stream'); toast('Backup saved to Downloads. It is encrypted, so keep your passwords and recovery key.'); }
+    catch (e) { toast(e.message); }
+    done();
+  } else if (choice === 'hide') hideAgain();
+}
+async function doErase() {
+  const go = await choose({ title: 'Uninstall / erase app data', text: `This removes your ${APP_NAME} vault from this phone. You will need your password. Afterwards you can delete the app icon.`,
+    options: [{ label: 'Continue', value: 'go', kind: 'primary' }, { label: 'Cancel', value: null }] });
+  if (go !== 'go') return;
+  const pw = await askPassword({ title: 'Uninstall', prompt: 'Enter your password to continue.', okText: 'Continue',
+    verify: async p => ((await V.unlock(p)) ? null : 'Wrong password. Try again.') });
+  if (pw == null) return;
+  const hiddenN = await V.hiddenCount();
+  if (hiddenN) {
+    const hp = await askPassword({ title: 'Uninstall', prompt: 'You also have hidden files. Enter the HIDDEN-files password.', okText: 'Continue',
+      verify: async p => ((await V.unlockHidden(p)) ? null : 'Wrong password. Try again.') });
+    if (hp == null) { V.lock(); return; }
+  }
+  await refreshItems();
+  const total = ui.items.files.length + ui.items.hidden.length;
+  if (total) {
+    const what = await choose({ title: `${total} file(s) are in the vault`, text: 'Save them to your Downloads folder first, or delete them with the vault?',
+      options: [{ label: 'Save them to my phone, then erase', value: 'save', kind: 'primary' }, { label: 'Erase everything', value: 'erase', kind: 'danger' }, { label: 'Cancel', value: null }] });
+    if (!what) { V.lock(); return; }
+    if (what === 'save') {
+      const done = busy('Saving your files…');
+      for (const [hid, list] of [[false, ui.items.files], [true, ui.items.hidden]]) {
+        for (const it of list) { try { const f = await V.read(it.id, hid); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); await sleep(450); } catch {} }
+      }
+      done();
+      const ok = await choose({ title: 'Are all your files in Downloads?', text: 'Check your Downloads folder. After this step the vault cannot be recovered.',
+        options: [{ label: 'Yes, erase the vault now', value: 'yes', kind: 'danger' }, { label: 'No, stop', value: null }] });
+      if (ok !== 'yes') { V.lock(); return; }
+    } else {
+      const sure = await choose({ title: 'Erase everything?', text: `Permanently delete ${total} file(s). This cannot be undone.`,
+        options: [{ label: 'Erase everything', value: 'yes', kind: 'danger' }, { label: 'Cancel', value: null }] });
+      if (sure !== 'yes') { V.lock(); return; }
+    }
+  }
+  const done = busy('Erasing…');
+  await V.erase();
+  done();
+  app.replaceChildren(h('main', { class: 'lock' }, h('div', { class: 'logo' }, icon('check')), h('h1', { text: 'Data erased' }),
+    h('p', { text: 'To finish, press and hold the Open Cheyyaku icon on your home screen, then choose Uninstall (or Remove).' }),
+    h('div', { class: 'stack' }, h('button', { class: 'btn wide', id: 'start-over', type: 'button', text: 'Start over', onclick: () => location.reload() }))));
+}
+
+/* ===================================================================== startup */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) ui.hiddenAt = Date.now();
+  else if (V.unlocked && ui.hiddenAt && Date.now() - ui.hiddenAt > 2 * 60 * 1000) { lockVault(); toast('Locked after being away.'); }
+});
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ui.installEvt = e; if (!V.unlocked && $('.lock')) renderLock(); });
+window.addEventListener('appinstalled', () => { ui.installEvt = null; });
+(async function start() {
+  if (!(window.crypto && crypto.subtle)) {
+    app.replaceChildren(h('main', { class: 'lock' }, h('div', { class: 'logo' }, icon('lock')), h('h1', { text: APP_NAME }),
+      h('div', { class: 'banner', text: 'This page needs a secure connection (https) to encrypt files. Open it from the https address you installed it from.' })));
+    return;
+  }
+  await Store.init(); await V.load(); renderLock();
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
