@@ -102,7 +102,9 @@ input.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
   -webkit-touch-callout: none; touch-action: pan-y;
 }
 .row[aria-selected="true"] { background: var(--sel); border-color: var(--accent); }
-.tick { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; color: transparent; }
+.tick { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 2px solid var(--border); display: none; place-items: center; color: transparent; }
+.list.selmode .tick { display: grid; }
+.list.selmode .more { display: none; }
 .row[aria-selected="true"] .tick { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .tick svg.i { width: 14px; height: 14px; stroke-width: 3; }
 .badge { flex: none; width: 42px; height: 42px; border-radius: 10px; background: var(--head); color: var(--muted); display: grid; place-items: center; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
@@ -130,7 +132,7 @@ input.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 }
 .selbar-in { max-width: 720px; margin: 0 auto; }
 .selcount { font-size: 14px; color: var(--muted); padding: 0 6px 6px; display: flex; justify-content: space-between; align-items: center; }
-.selactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.selactions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .selactions button {
   display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: transparent; padding: 6px 2px;
   border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text);
@@ -169,6 +171,19 @@ input.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .swatch { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 1px solid rgba(128,128,128,.4); }
 .recovery { font: 600 20px/1.5 ui-monospace, Consolas, monospace; letter-spacing: .04em; text-align: center; background: var(--head); border-radius: 12px; padding: 14px 8px; word-break: break-all; user-select: all; -webkit-user-select: all; }
 
+/* notes and links */
+.badge.kind { background: var(--accent); color: var(--on-accent); }
+.editor { position: fixed; inset: 0; z-index: 15; background: var(--bg); display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px)); }
+.editor-bar { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+.editor-bar .t { flex: 1; font-weight: 700; font-size: 18px; }
+.editor-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 24px; }
+textarea.field { width: 100%; min-height: 38vh; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); line-height: 1.5; resize: vertical; }
+textarea.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.links { display: flex; flex-direction: column; gap: 6px; }
+.links a { color: var(--accent); word-break: break-all; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; font-weight: 600; }
+a.btn { text-decoration: none; }
+
 /* viewer */
 .viewer { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; flex-direction: column; color: #fff; }
 .viewer-bar { display: flex; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 8px; background: rgba(0,0,0,.7); }
@@ -194,7 +209,7 @@ input.field:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 <script>
 'use strict';
 /* ===================================================================== helpers */
-const APP_NAME = 'Open Cheyyaku';
+const APP_NAME = 'Open Cheyyaku', APP_VERSION = '2';
 const enc = new TextEncoder(), dec = new TextDecoder();
 const $ = (s, r = document) => r.querySelector(s);
 
@@ -227,7 +242,9 @@ const ICONS = {
   dots: '<circle cx="12" cy="5.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18.5" r="1.4"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
-  install: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><rect x="4" y="18" width="16" height="2" rx="1"/>'
+  install: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><rect x="4" y="18" width="16" height="2" rx="1"/>',
+  note: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'
 };
 function icon(name) {
   const s = document.createElement('span');
@@ -383,30 +400,23 @@ const V = {
   exists() { return !!this.meta; },
   get unlocked() { return !!this.filesKey; },
   get hiddenUnlocked() { return !!this.hiddenKey; },
-  checkPasswords(main, hidden) {
-    if (main.length < MIN_PW || hidden.length < MIN_PW) throw new Error(`Passwords need at least ${MIN_PW} characters.`);
-    if (main === hidden) throw new Error('The hidden-files password must be different from the main password.');
+  checkPassword(pw) { if (pw.length < MIN_PW) throw new Error(`Passwords need at least ${MIN_PW} characters.`); },
+  get hasHiddenPassword() { return !!(this.meta && this.meta.hid_wrapped); },
+  async wrapWith(secret, raw, iter, prefix) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    return { [prefix + '_salt']: b64(salt), [prefix + '_wrapped']: b64(await seal(await deriveKey(secret, salt, iter), raw)) };
   },
-  async wrapAll(main, hidden, filesRaw, hiddenRaw, recovery) {
-    const pwSalt = crypto.getRandomValues(new Uint8Array(16)), hidSalt = crypto.getRandomValues(new Uint8Array(16));
-    const meta = { k: 'vault', version: 1, iterations: ITER,
-      pw_salt: b64(pwSalt), pw_wrapped: b64(await seal(await deriveKey(main, pwSalt, ITER), filesRaw)),
-      hid_salt: b64(hidSalt), hid_wrapped: b64(await seal(await deriveKey(hidden, hidSalt, ITER), hiddenRaw)) };
-    if (recovery) {
-      const recSalt = crypto.getRandomValues(new Uint8Array(16));
-      const bundle = enc.encode(JSON.stringify({ files: b64(filesRaw), hidden: b64(hiddenRaw) }));
-      meta.rec_salt = b64(recSalt);
-      meta.rec_wrapped = b64(await seal(await deriveKey(normRecovery(recovery), recSalt, ITER), bundle));
-    }
-    return meta;
-  },
-  async create(main, hidden) {
-    this.checkPasswords(main, hidden);
+  async create(main) {
+    this.checkPassword(main);
     const filesRaw = crypto.getRandomValues(new Uint8Array(32)), hiddenRaw = crypto.getRandomValues(new Uint8Array(32));
-    const recovery = newRecoveryKey();
-    this.meta = await this.wrapAll(main, hidden, filesRaw, hiddenRaw, recovery);
+    const recovery = newRecoveryKey(), filesKey = await dataKey(filesRaw);
+    const bundle = enc.encode(JSON.stringify({ files: b64(filesRaw), hidden: b64(hiddenRaw) }));
+    this.meta = { k: 'vault', version: 1, iterations: ITER,
+      ...(await this.wrapWith(main, filesRaw, ITER, 'pw')),
+      ...(await this.wrapWith(normRecovery(recovery), bundle, ITER, 'rec')),
+      hid_pending: b64(await seal(filesKey, hiddenRaw)) };   // the hidden-files key waits here until the user picks a hidden-files password
     await Store.put('meta', this.meta);
-    this.filesKey = await dataKey(filesRaw); this.hiddenKey = null;
+    this.filesKey = filesKey; this.hiddenKey = null;
     return recovery;
   },
   async tryOpen(secret, saltField, wrappedField) {
@@ -414,16 +424,34 @@ const V = {
     try { return await unseal(await deriveKey(secret, unb64(m[saltField]), m.iterations), unb64(m[wrappedField])); } catch { return null; }
   },
   async unlock(pw) { const raw = await this.tryOpen(pw, 'pw_salt', 'pw_wrapped'); if (!raw) return false; this.filesKey = await dataKey(raw); return true; },
-  async unlockHidden(pw) { const raw = await this.tryOpen(pw, 'hid_salt', 'hid_wrapped'); if (!raw) return false; this.hiddenKey = await dataKey(raw); return true; },
+  async isMainPassword(pw) { return !!(await this.tryOpen(pw, 'pw_salt', 'pw_wrapped')); },
+  async unlockHidden(pw) {
+    if (!this.hasHiddenPassword) return false;
+    const raw = await this.tryOpen(pw, 'hid_salt', 'hid_wrapped'); if (!raw) return false;
+    this.hiddenKey = await dataKey(raw); return true;
+  },
+  async setHiddenPassword(pw) {   // first use of Hidden: the user chooses its password now
+    this.need(false); this.checkPassword(pw);
+    if (this.hasHiddenPassword) throw new Error('Hidden files already have a password.');
+    const raw = await unseal(this.filesKey, unb64(this.meta.hid_pending));
+    const meta = { ...this.meta, ...(await this.wrapWith(pw, raw, this.meta.iterations, 'hid')) };
+    delete meta.hid_pending;
+    await Store.put('meta', meta); this.meta = meta; this.hiddenKey = await dataKey(raw);
+  },
   async checkRecovery(k) { return !!(await this.tryOpen(normRecovery(k), 'rec_salt', 'rec_wrapped')); },
   async resetWithRecovery(k, newMain, newHidden) {
-    this.checkPasswords(newMain, newHidden);
+    this.checkPassword(newMain);
     const raw = await this.tryOpen(normRecovery(k), 'rec_salt', 'rec_wrapped');
     if (!raw) return false;
-    const keys = JSON.parse(dec.decode(raw));
-    const meta = await this.wrapAll(newMain, newHidden, unb64(keys.files), unb64(keys.hidden), null);
-    meta.rec_salt = this.meta.rec_salt; meta.rec_wrapped = this.meta.rec_wrapped;   // recovery key stays valid
-    this.meta = meta; await Store.put('meta', meta); this.lock();
+    const keys = JSON.parse(dec.decode(raw)), it = this.meta.iterations;
+    let meta = { ...this.meta, ...(await this.wrapWith(newMain, unb64(keys.files), it, 'pw')) };
+    if (this.hasHiddenPassword) {
+      if (!newHidden) throw new Error('Please choose a new hidden-files password.');
+      this.checkPassword(newHidden);
+      if (newHidden === newMain) throw new Error('The hidden-files password must be different from the main password.');
+      meta = { ...meta, ...(await this.wrapWith(newHidden, unb64(keys.hidden), it, 'hid')) };
+    }
+    await Store.put('meta', meta); this.meta = meta; this.lock();
     return true;
   },
   lock() { this.filesKey = null; this.hiddenKey = null; },
@@ -432,24 +460,28 @@ const V = {
   need(hidden) { const [h1, d1, key] = this.stores(hidden); if (!key) throw new Error(hidden ? 'Hidden files are locked.' : 'Vault is locked.'); return [h1, d1, key]; },
   hiddenCount() { return Store.count('hidden'); },
 
-  async add(file, hidden) {
+  async put(hidden, name, type, data, extra = {}) {
     const [hs, ds, key] = this.need(hidden);
-    if (file.size > MAX_FILE) throw new Error(`too big for the phone version (limit ${humanSize(MAX_FILE)})`);
-    const data = new Uint8Array(await file.arrayBuffer());
     const id = randomId();
-    const head = await seal(key, enc.encode(JSON.stringify({ name: file.name, type: file.type || '', size: data.length, added: Date.now() })));
+    const head = await seal(key, enc.encode(JSON.stringify({ name, type, size: data.length, added: Date.now(), ...extra })));
     await Store.put(ds, { id, data: await seal(key, data) });
     await Store.put(hs, { id, head });
     const back = await unseal(key, (await Store.get(ds, id)).data);   // verify before reporting success
     if (!bytesEqual(back, data)) { await Store.del(hs, id); await Store.del(ds, id); throw new Error('could not verify the stored copy'); }
     return id;
   },
+  async add(file, hidden) {
+    this.need(hidden);
+    if (file.size > MAX_FILE) throw new Error(`too big for the phone version (limit ${humanSize(MAX_FILE)})`);
+    return this.put(hidden, file.name, file.type || '', new Uint8Array(await file.arrayBuffer()));
+  },
+  addNote(hidden, title, body, kind) { return this.put(hidden, title, 'text/plain', enc.encode(body), { kind }); },
   async list(hidden) {
     const [hs, , key] = this.need(hidden);
     const out = [];
     for (const rec of await Store.all(hs)) {
       const m = JSON.parse(dec.decode(await unseal(key, rec.head)));
-      out.push({ id: rec.id, name: m.name, type: m.type, size: m.size, added: m.added });
+      out.push({ id: rec.id, name: m.name, type: m.type, size: m.size, added: m.added, kind: m.kind || null });
     }
     return out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   },
@@ -458,10 +490,10 @@ const V = {
     const m = JSON.parse(dec.decode(await unseal(key, (await Store.get(hs, id)).head)));
     return { ...m, data: await unseal(key, (await Store.get(ds, id)).data) };
   },
-  async update(id, hidden, data) {
+  async update(id, hidden, data, name) {
     const [hs, ds, key] = this.need(hidden);
     const m = JSON.parse(dec.decode(await unseal(key, (await Store.get(hs, id)).head)));
-    m.size = data.length;
+    m.size = data.length; if (name != null) m.name = name;
     await Store.put(ds, { id, data: await seal(key, data) });
     await Store.put(hs, { id, head: await seal(key, enc.encode(JSON.stringify(m))) });
   },
@@ -524,13 +556,46 @@ function safeAppend(el) {
   el.append = (...kids) => native(...kids.flat().filter(k => k != null && k !== false));
   return el;
 }
+/* Android Back button. One spare history entry is kept above the page; each Back press lands on the real
+   entry, we close the top layer inside the app, then put the spare entry back. Only when there is nothing
+   left to close do we let the next Back press leave the app. */
+const Nav = {
+  trapped: !!(history.state && history.state.oc), timer: null, modals: [],
+  rearm() {
+    clearTimeout(this.timer); this.timer = null;
+    if (this.trapped) return;
+    try { history.pushState({ oc: 1 }, ''); this.trapped = true; } catch {}
+  },
+  onPop() {
+    this.trapped = false;
+    if (this.back()) { this.rearm(); return; }
+    toast('Press back again to exit');
+    this.timer = setTimeout(() => this.rearm(), 2200);
+  },
+  back() {   // returns true when something inside the app was closed or undone
+    const top = this.modals[this.modals.length - 1];
+    if (top) { if (top.dismiss) top.close(); return true; }
+    if (ui.editorClose && $('.editor')) { ui.editorClose(); return true; }
+    if ($('.viewer')) { closeViewer(); return true; }
+    if (V.unlocked && $('#list-host')) {
+      if (ui.sel.size) { clearSel(); return true; }
+      if (ui.tab === 'hidden') { switchTab('files'); return true; }
+    }
+    return false;
+  }
+};
+window.addEventListener('popstate', () => Nav.onPop());
+document.addEventListener('pointerdown', () => Nav.rearm(), true);
+
 function modal(build, { dismiss = true } = {}) {
   return new Promise(resolve => {
     document.querySelectorAll('.toast').forEach(t => t.remove());
     const scrim = h('div', { class: 'scrim' });
     const box = safeAppend(h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true' }));
+    const layer = { dismiss, close: () => close(null) };
     const onKey = e => { if (e.key === 'Escape' && dismiss) close(null); };
-    const close = v => { document.removeEventListener('keydown', onKey); scrim.remove(); resolve(v); };
+    const close = v => { Nav.modals = Nav.modals.filter(l => l !== layer); document.removeEventListener('keydown', onKey); scrim.remove(); resolve(v); };
+    Nav.modals.push(layer);
     scrim.addEventListener('pointerdown', e => { if (e.target === scrim && dismiss) close(null); });
     document.addEventListener('keydown', onKey);
     scrim.append(box); document.body.append(scrim);
@@ -629,14 +694,11 @@ async function doInstall() {
   ui.installEvt = null; renderLock();
 }
 async function doCreate() {
-  const main = await askPassword({ title: 'Create vault', prompt: 'Step 1 of 2: create the password for your FILES.', confirm: true, verify: shortPw });
+  const main = await askPassword({ title: 'Create vault', prompt: 'Create a password for your vault.', confirm: true, verify: shortPw });
   if (main == null) return;
-  const hid = await askPassword({ title: 'Create vault', prompt: 'Step 2 of 2: create a DIFFERENT password for your HIDDEN files.', confirm: true,
-    verify: p => shortPw(p) || (p === main ? 'This must be different from your main password.' : null) });
-  if (hid == null) return;
   const done = busy('Creating vault…');
   let key;
-  try { key = await V.create(main, hid); } catch (e) { done(); toast(e.message); return; }
+  try { key = await V.create(main); } catch (e) { done(); toast(e.message); return; }
   done();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}
   await showRecovery(key);
@@ -652,13 +714,16 @@ async function doForgot() {
   const key = await askPassword({ title: 'Forgot password', prompt: 'Enter your recovery key.', mask: false, okText: 'Continue',
     verify: async k => ((await V.checkRecovery(k)) ? null : 'That recovery key is not correct.') });
   if (key == null) return;
-  const m = await askPassword({ title: 'New password', prompt: 'Choose a NEW password for your FILES.', confirm: true, verify: shortPw });
+  const m = await askPassword({ title: 'New password', prompt: 'Choose a NEW password for your vault.', confirm: true, verify: shortPw });
   if (m == null) return;
-  const hd = await askPassword({ title: 'New hidden-files password', prompt: 'Choose a NEW, DIFFERENT password for your HIDDEN files.', confirm: true,
-    verify: p => shortPw(p) || (p === m ? 'This must be different from your main password.' : null) });
-  if (hd == null) return;
+  let hd = null;
+  if (V.hasHiddenPassword) {
+    hd = await askPassword({ title: 'New hidden-files password', prompt: 'Choose a NEW, DIFFERENT password for your hidden files.', confirm: true,
+      verify: p => shortPw(p) || (p === m ? 'This must be different from your main password.' : null) });
+    if (hd == null) return;
+  }
   const done = busy('Saving…');
-  try { await V.resetWithRecovery(key, m, hd); toast('Passwords changed. Unlock with your new password.'); } catch (e) { toast(e.message); }
+  try { await V.resetWithRecovery(key, m, hd); toast('Password changed. Unlock with your new password.'); } catch (e) { toast(e.message); }
   done(); renderLock();
 }
 async function doRestore() {
@@ -666,7 +731,7 @@ async function doRestore() {
   inp.addEventListener('change', async () => {
     if (!inp.files[0]) return;
     const done = busy('Restoring…');
-    try { const n = await V.restoreBackup(inp.files[0]); done(); renderLock(`Restored ${n} file(s). Unlock with the passwords you used for that vault.`); }
+    try { const n = await V.restoreBackup(inp.files[0]); done(); renderLock(`Restored ${n} item(s). Unlock with the password(s) you used for that vault.`); }
     catch (e) { done(); toast(e.message); }
   });
   inp.click();
@@ -682,7 +747,7 @@ function lockVault() {
   closeViewer(); V.lock(); ui.items = { files: [], hidden: [] }; ui.sel.clear(); renderLock();
 }
 function renderVault() {
-  const search = h('input', { class: 'field search', id: 'search', type: 'search', placeholder: 'Search files', 'aria-label': 'Search files', value: ui.q });
+  const search = h('input', { class: 'field search', id: 'search', type: 'search', placeholder: 'Search files and notes', 'aria-label': 'Search files and notes', value: ui.q });
   search.addEventListener('input', () => { ui.q = search.value; renderList(); });
   const tabBtn = (key, label) => h('button', { class: 'tab', role: 'tab', 'data-tab': key, 'aria-selected': String(ui.tab === key), onclick: () => switchTab(key) }, label);
   app.replaceChildren(
@@ -693,7 +758,7 @@ function renderVault() {
       h('div', { class: 'tabs', role: 'tablist' }, tabBtn('files', h('span', { id: 'tab-files' })), tabBtn('hidden', h('span', { id: 'tab-hidden' }))),
       search),
     h('main', { id: 'list-host' }),
-    h('button', { class: 'fab', id: 'fab', 'aria-label': 'Add files', onclick: () => addFiles() }, icon('plus')),
+    h('button', { class: 'fab', id: 'fab', 'aria-label': 'Add', onclick: () => addMenu() }, icon('plus')),
     h('div', { class: 'selbar', id: 'selbar', hidden: true }));
   renderList(); renderBars();
 }
@@ -706,45 +771,72 @@ function switchTab(key) {
 }
 async function revealHidden() {
   if (V.hiddenUnlocked) return true;
-  const pw = await askPassword({ title: 'Hidden files', prompt: 'Enter the password for your HIDDEN files.', okText: 'Show',
-    verify: async p => ((await V.unlockHidden(p)) ? null : 'Wrong password. Try again.') });
-  if (pw == null) return false;
+  if (!V.hasHiddenPassword) {
+    const pw = await askPassword({ title: 'Set up hidden files', okText: 'Create', confirm: true,
+      prompt: 'Choose a separate password for your hidden files. It must be different from your main password. You only do this once.',
+      verify: async p => shortPw(p) || ((await V.isMainPassword(p)) ? 'This must be different from your main password.' : null) });
+    if (pw == null) return false;
+    const done = busy('Setting up…');
+    try { await V.setHiddenPassword(pw); } catch (e) { done(); toast(e.message); return false; }
+    done();
+  } else {
+    const pw = await askPassword({ title: 'Hidden files', prompt: 'Enter the password for your hidden files.', okText: 'Show',
+      verify: async p => ((await V.unlockHidden(p)) ? null : 'Wrong password. Try again.') });
+    if (pw == null) return false;
+  }
   await refreshItems(); renderList(); renderBars();
   return true;
+}
+function visibleItems() {
+  const q = ui.q.trim().toLowerCase();
+  return ui.items[currentHidden() ? 'hidden' : 'files'].filter(it => it.name.toLowerCase().includes(q));
+}
+function clearSel() {
+  ui.sel.clear(); document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-selected', 'false')); renderBars();
+}
+function selectAll() {
+  visibleItems().forEach(i => ui.sel.add(i.id));
+  document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-selected', String(ui.sel.has(r.dataset.id)))); renderBars();
 }
 function renderBars() {
   const f = $('#tab-files'), hd = $('#tab-hidden'); if (!f) return;
   f.textContent = `Files ${ui.items.files.length}`;
   hd.replaceChildren(V.hiddenUnlocked ? `Hidden ${ui.items.hidden.length}` : h('span', { style: 'display:inline-flex;align-items:center;gap:6px' }, icon('lock'), 'Hidden'));
-  const n = ui.sel.size, bar = $('#selbar'), fab = $('#fab');
+  const n = ui.sel.size, bar = $('#selbar'), fab = $('#fab'), ul = $('#list-host .list');
+  if (ul) ul.classList.toggle('selmode', n > 0);
   bar.hidden = n === 0; fab.hidden = n > 0 || (currentHidden() && !V.hiddenUnlocked);
   if (n === 0) { bar.replaceChildren(); return; }
   const act = (label, ic, fn, cls, id) => h('button', { class: cls || '', id, type: 'button', onclick: fn }, icon(ic), label);
   bar.replaceChildren(h('div', { class: 'selbar-in' },
-    h('div', { class: 'selcount' }, h('span', { text: `${n} selected` }), h('button', { class: 'link', type: 'button', id: 'sel-clear', text: 'Clear', onclick: () => { ui.sel.clear(); renderList(); renderBars(); } })),
+    h('div', { class: 'selcount' }, h('span', { text: `${n} selected` }),
+      h('span', {}, h('button', { class: 'link', type: 'button', id: 'sel-all', text: 'Select all', onclick: selectAll }),
+        h('button', { class: 'link', type: 'button', id: 'sel-clear', text: 'Clear', onclick: clearSel }))),
     h('div', { class: 'selactions' },
       act('Open', 'open', () => openFile([...ui.sel][0]), '', 'act-open'),
       act('Remove', 'out', () => removeFromVault([...ui.sel]), '', 'act-remove'),
       act(currentHidden() ? 'Unhide' : 'Hide', currentHidden() ? 'eye' : 'eyeoff', () => moveItems([...ui.sel], !currentHidden()), '', 'act-move'),
-      act('Delete', 'trash', () => deleteItems([...ui.sel]), 'danger', 'act-delete'))));
+      act('Delete', 'trash', () => deleteItems([...ui.sel]), 'danger', 'act-delete'),
+      act('More', 'dots', () => openMenuFor([...ui.sel]), '', 'act-more'))));
   const openBtn = $('#act-open'); if (openBtn) openBtn.style.visibility = n === 1 ? 'visible' : 'hidden';
 }
 function renderList() {
   const host = $('#list-host'); if (!host) return;
   const hidden = currentHidden();
   if (hidden && !V.hiddenUnlocked) {
-    host.replaceChildren(h('div', { class: 'locked-card' }, h('strong', { text: 'Hidden files are locked' }), h('p', { text: 'They need their own password.' }),
-      h('button', { class: 'btn primary', id: 'reveal-btn', type: 'button', text: 'Show hidden files', onclick: revealHidden })));
+    const first = !V.hasHiddenPassword;
+    host.replaceChildren(h('div', { class: 'locked-card' },
+      h('strong', { text: first ? 'Keep private things here' : 'Hidden files are locked' }),
+      h('p', { text: first ? 'Files, notes and links in this section have their own password. You choose it the first time.' : 'They need their own password.' }),
+      h('button', { class: 'btn primary', id: 'reveal-btn', type: 'button', text: first ? 'Set up hidden files' : 'Show hidden files', onclick: revealHidden })));
     return;
   }
-  const q = ui.q.trim().toLowerCase();
-  const items = ui.items[hidden ? 'hidden' : 'files'].filter(it => it.name.toLowerCase().includes(q));
+  const items = visibleItems(), q = ui.q.trim();
   ui.sel.forEach(id => { if (!items.some(i => i.id === id)) ui.sel.delete(id); });
-  const ul = h('ul', { class: 'list', role: 'listbox', 'aria-multiselectable': 'true' });
+  const ul = h('ul', { class: 'list' + (ui.sel.size ? ' selmode' : ''), role: 'listbox', 'aria-multiselectable': 'true' });
   if (!items.length) {
     host.replaceChildren(h('div', { class: 'empty' },
-      h('strong', { text: q ? 'No matching files' : hidden ? 'No hidden files yet' : 'No files yet' }),
-      q ? 'Try a different name.' : 'Tap the + button to add files.',
+      h('strong', { text: q ? 'Nothing found' : hidden ? 'No hidden items yet' : 'Nothing here yet' }),
+      q ? 'Try a different name.' : 'Tap the + button to add files, notes or links.',
       hidden && !q && h('div', { style: 'margin-top:14px' }, h('button', { class: 'link', type: 'button', text: 'Hide again', onclick: hideAgain }))));
     return;
   }
@@ -755,44 +847,46 @@ function hideAgain() {
   V.lockHidden(); ui.items.hidden = []; ui.sel.clear(); renderList(); renderBars(); toast('Hidden files are locked again.');
 }
 function rowFor(it) {
-  const selected = ui.sel.has(it.id);
   let timer = null, sx = 0, sy = 0, longDone = false;
-  const row = h('li', { class: 'row', role: 'option', 'data-id': it.id, 'aria-selected': String(selected), tabindex: '0' },
+  const badge = it.kind === 'link' ? 'LINK' : it.kind === 'note' ? 'NOTE' : (ext(it.name) || 'file').slice(0, 4).toUpperCase();
+  const meta = it.kind ? `${it.kind === 'link' ? 'Link' : 'Note'} · ${fmtDate(it.added)}` : `${humanSize(it.size)} · ${fmtDate(it.added)}`;
+  const row = h('li', { class: 'row', role: 'option', 'data-id': it.id, 'aria-selected': String(ui.sel.has(it.id)), tabindex: '0' },
     h('span', { class: 'tick' }, icon('check')),
-    h('span', { class: 'badge', text: (ext(it.name) || 'file').slice(0, 4).toUpperCase() }),
-    h('div', { class: 'info' }, h('div', { class: 'name', text: it.name }), h('div', { class: 'meta', text: `${humanSize(it.size)} · ${fmtDate(it.added)}` })),
-    h('button', { class: 'icon-btn more', 'aria-label': `Options for ${it.name}`, onclick: e => { e.stopPropagation(); openMenuFor(it.id); } }, icon('dots')));
+    h('span', { class: 'badge' + (it.kind ? ' kind' : ''), text: badge }),
+    h('div', { class: 'info' }, h('div', { class: 'name', text: it.name }), h('div', { class: 'meta', text: meta })),
+    h('button', { class: 'icon-btn more', 'aria-label': `Options for ${it.name}`, onclick: e => { e.stopPropagation(); openMenuFor([it.id]); } }, icon('dots')));
   const toggle = () => {
     if (ui.sel.has(it.id)) ui.sel.delete(it.id); else ui.sel.add(it.id);
     row.setAttribute('aria-selected', String(ui.sel.has(it.id))); renderBars();
   };
-  row.addEventListener('click', () => { if (longDone) { longDone = false; return; } toggle(); });
-  row.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
-  row.addEventListener('dblclick', () => openFile(it.id));
+  const tap = () => { if (ui.sel.size) toggle(); else openFile(it.id); };   // normal tap opens; once something is selected, tap toggles
+  const startSelect = () => {                                               // long press starts multi-select
+    if (!ui.sel.has(it.id)) { ui.sel.add(it.id); row.setAttribute('aria-selected', 'true'); renderBars(); }
+    try { navigator.vibrate && navigator.vibrate(15); } catch {}
+  };
+  row.addEventListener('click', () => { if (longDone) { longDone = false; return; } tap(); });
+  row.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); tap(); } });
   row.addEventListener('pointerdown', e => {
     if (e.target.closest('.more')) return;
     sx = e.clientX; sy = e.clientY; longDone = false;
-    timer = setTimeout(() => { longDone = true; openMenuFor(it.id); }, 550);
+    timer = setTimeout(() => { longDone = true; startSelect(); }, 500);
   });
   const cancel = () => clearTimeout(timer);
   row.addEventListener('pointermove', e => { if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 10) cancel(); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => row.addEventListener(t, cancel));
-  row.addEventListener('contextmenu', e => { e.preventDefault(); if (!longDone) { longDone = true; cancel(); openMenuFor(it.id); } });
+  row.addEventListener('contextmenu', e => { e.preventDefault(); if (!longDone) { longDone = true; cancel(); startSelect(); } });
   return row;
 }
 
 /* ===================================================================== file actions */
-function targetsFor(id) {   // long-press / menu: act on the selection if the row is in it, otherwise just that row
-  if (!ui.sel.has(id)) { ui.sel = new Set([id]); document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-selected', String(r.dataset.id === id))); renderBars(); }
-  return [...ui.sel];
-}
-async function openMenuFor(id) {
-  const ids = targetsFor(id), hidden = currentHidden(), many = ids.length > 1;
-  const it = ui.items[hidden ? 'hidden' : 'files'].find(i => i.id === id);
+async function openMenuFor(ids) {
+  const hidden = currentHidden(), many = ids.length > 1;
+  const it = ui.items[hidden ? 'hidden' : 'files'].find(i => i.id === ids[0]);
+  if (!it) return;
   const canShare = !!navigator.canShare && !many;
   const choice = await modal((box, close) => {
     const b = (label, ic, value, cls) => h('button', { type: 'button', class: cls || '', 'data-act': value, onclick: () => close(value) }, icon(ic), label);
-    box.append(h('div', { class: 'menu-title', text: many ? `${ids.length} files selected` : it.name }),
+    box.append(h('div', { class: 'menu-title', text: many ? `${ids.length} items selected` : it.name }),
       h('div', { class: 'menu' },
         !many && b('Open', 'open', 'open'),
         b('Remove from vault', 'out', 'remove'),
@@ -806,6 +900,83 @@ async function openMenuFor(id) {
   if (!choice) return;
   ({ open: () => openFile(ids[0]), remove: () => removeFromVault(ids), copy: () => saveCopies(ids), share: () => shareFile(ids[0]),
     hide: () => moveItems(ids, true), unhide: () => moveItems(ids, false), delete: () => deleteItems(ids) })[choice]();
+}
+async function addMenu() {
+  const c = await modal((box, close) => {
+    const b = (label, ic, value) => h('button', { type: 'button', 'data-act': value, onclick: () => close(value) }, icon(ic), label);
+    box.append(h('div', { class: 'menu-title', text: currentHidden() ? 'Add to Hidden' : 'Add to Files' }),
+      h('div', { class: 'menu' }, b('Add files', 'plus', 'files'), b('New note', 'note', 'note'), b('Save a link', 'link', 'link')));
+  });
+  if (c === 'files') addFiles(); else if (c) newNote(c);
+}
+async function newNote(kind) {
+  const hidden = currentHidden();
+  if (hidden && !(await revealHidden())) return;
+  openNote({ hidden, kind });
+}
+function findLinks(text) {
+  const out = [], re = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi; let m;
+  while ((m = re.exec(text))) {
+    let u = m[1].replace(/[.,;:!?)\]}]+$/, ''); if (/^www\./i.test(u)) u = 'https://' + u;
+    try { const p = new URL(u); if ((p.protocol === 'http:' || p.protocol === 'https:') && !out.includes(p.href)) out.push(p.href); } catch {}
+  }
+  return out;
+}
+function exportOf(f) {   // what a stored item becomes when it leaves the vault: files keep their name, notes and links become .txt
+  if (f.kind) return { name: (f.name.replace(/[\\/:*?"<>|]+/g, '_').trim().slice(0, 80) || 'note') + '.txt', data: f.data, type: 'text/plain' };
+  return { name: f.name, data: f.data, type: mimeOf(f.name, f.type) };
+}
+function closeEditor() { const e = $('.editor'); if (e) e.remove(); ui.editorClose = null; }
+async function openNote({ id = null, kind = 'note', hidden }) {
+  closeViewer(); closeEditor();
+  let title = '', body = '';
+  if (id) {
+    let f; try { f = await V.read(id, hidden); } catch (e) { toast(e.message); return; }
+    title = f.name; body = dec.decode(f.data); kind = f.kind || 'note';
+  }
+  const isLink = kind === 'link';
+  const titleIn = h('input', { class: 'field', id: 'note-title', placeholder: isLink ? 'Name (for example: Bank website)' : 'Title', maxlength: '120', autocomplete: 'off' });
+  const bodyIn = h('textarea', { class: 'field note-body', id: 'note-body', placeholder: isLink ? 'Paste the link here' : 'Write your note here' });
+  titleIn.value = title; bodyIn.value = body;
+  let saved = { title, body };
+  const linksBox = h('div', { class: 'links', id: 'note-links' });
+  const openLink = h('a', { class: 'btn primary wide', id: 'open-link', target: '_blank', rel: 'noopener noreferrer', text: 'Open link', hidden: true });
+  const refreshLinks = () => {
+    const urls = findLinks(bodyIn.value);
+    linksBox.replaceChildren(...(urls.length ? [h('div', { class: 'muted', text: 'Tap a link to open it' }), ...urls.map(u => h('a', { href: u, target: '_blank', rel: 'noopener noreferrer', text: u }))] : []));
+    if (isLink && urls.length) { openLink.href = urls[0]; openLink.hidden = false; } else openLink.hidden = true;
+  };
+  bodyIn.addEventListener('input', refreshLinks); refreshLinks();
+  const dirty = () => titleIn.value !== saved.title || bodyIn.value !== saved.body;
+  async function save() {
+    if (!bodyIn.value.trim() && !titleIn.value.trim()) { toast('Nothing to save yet.'); return false; }
+    let t = titleIn.value.trim();
+    if (!t) {
+      const first = bodyIn.value.trim().split('\n')[0];
+      let host = ''; if (isLink) { try { host = new URL(findLinks(first)[0] || '').hostname; } catch {} }
+      t = host || first.slice(0, 40) || (isLink ? 'Link' : 'Note');
+    }
+    try {
+      if (id) await V.update(id, hidden, enc.encode(bodyIn.value), t); else id = await V.addNote(hidden, t, bodyIn.value, kind);
+    } catch (e) { toast(e.message); return false; }
+    saved = { title: t, body: bodyIn.value }; titleIn.value = t;
+    await refreshItems(); renderList(); renderBars(); toast('Saved.');
+    return true;
+  }
+  const el = h('div', { class: 'editor', role: 'dialog', 'aria-label': isLink ? 'Link' : 'Note' },
+    h('div', { class: 'editor-bar' },
+      h('button', { class: 'icon-btn', id: 'note-close', 'aria-label': 'Close', onclick: () => requestClose() }, icon('close')),
+      h('div', { class: 't', text: (id ? '' : 'New ') + (isLink ? 'link' : 'note') }),
+      h('button', { class: 'btn primary', id: 'note-save', type: 'button', text: 'Save', onclick: save })),
+    h('div', { class: 'editor-body' }, titleIn, bodyIn, openLink, linksBox));
+  async function requestClose() {
+    if (!dirty()) { closeEditor(); return; }
+    const c = await choose({ title: 'Save your changes?', options: [{ label: 'Save', value: 'save', kind: 'primary' }, { label: 'Discard', value: 'discard', kind: 'danger' }, { label: 'Keep editing', value: null }] });
+    if (c === 'save') { if (await save()) closeEditor(); } else if (c === 'discard') closeEditor();
+  }
+  ui.editorClose = requestClose;
+  document.body.append(el);
+  if (!id) (isLink ? titleIn : titleIn).focus({ preventScroll: true });
 }
 async function addFiles() {
   const hidden = currentHidden();
@@ -826,8 +997,11 @@ let viewerUrl = null;
 function closeViewer() { const v = $('.viewer'); if (v) v.remove(); if (viewerUrl) { URL.revokeObjectURL(viewerUrl); viewerUrl = null; } }
 async function openFile(id) {
   const hidden = currentHidden();
+  const it = ui.items[hidden ? 'hidden' : 'files'].find(i => i.id === id);
+  if (it && it.kind) return openNote({ id, hidden });
   closeViewer();   // must happen before the new blob URL is created (closing revokes the previous one)
-  let f; try { f = await V.read(id, hidden); } catch (e) { toast(e.message); return; }
+  const done = it && it.size > 1500000 ? busy('Opening…') : () => {};
+  let f; try { f = await V.read(id, hidden); } catch (e) { done(); toast(e.message); return; }
   const type = mimeOf(f.name, f.type);
   const blobUrl = () => (viewerUrl = URL.createObjectURL(new Blob([f.data], { type })));
   let body;
@@ -836,36 +1010,38 @@ async function openFile(id) {
   else if (type.startsWith('audio/')) body = h('audio', { src: blobUrl(), controls: true });
   else if (type.startsWith('text/') || type === 'application/json') body = h('pre', { text: dec.decode(f.data.subarray(0, 300000)) });
   else {
+    done();
     const canShare = !!navigator.canShare && navigator.canShare({ files: [new File([f.data], f.name, { type })] });
     const choice = await choose({ title: f.name, text: 'This type of file cannot be shown inside the app.',
       options: [canShare && { label: 'Open in another app', value: 'share', kind: 'primary' }, { label: 'Save a copy to Downloads', value: 'save' }, { label: 'Cancel', value: null }].filter(Boolean) });
     if (choice === 'share') shareFile(id); else if (choice === 'save') saveCopies([id]);
     return;
   }
+  done();
   document.body.append(h('div', { class: 'viewer', role: 'dialog', 'aria-label': f.name },
     h('div', { class: 'viewer-bar' }, h('div', { class: 't', text: f.name }), h('button', { class: 'icon-btn', id: 'viewer-close', 'aria-label': 'Close', onclick: closeViewer }, icon('close'))),
     h('div', { class: 'viewer-body' }, body)));
 }
 async function shareFile(id) {
   try {
-    const f = await V.read(id, currentHidden());
-    await navigator.share({ files: [new File([f.data], f.name, { type: mimeOf(f.name, f.type) })], title: f.name });
+    const x = exportOf(await V.read(id, currentHidden()));
+    await navigator.share({ files: [new File([x.data], x.name, { type: x.type })], title: x.name });
   } catch (e) { if (e.name !== 'AbortError') toast('Sharing is not available here. Use "Save a copy" instead.'); }
 }
 async function saveCopies(ids) {
   const hidden = currentHidden(); let n = 0;
-  for (const id of ids) { try { const f = await V.read(id, hidden); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); n++; await sleep(450); } catch (e) { toast(e.message); } }
-  if (n) toast(`Saved ${n} file(s) to your Downloads folder.`);
+  for (const id of ids) { try { const x = exportOf(await V.read(id, hidden)); saveBytes(x.name, x.data, x.type); n++; await sleep(450); } catch (e) { toast(e.message); } }
+  if (n) toast(`Saved ${n} item(s) to your Downloads folder.`);
 }
 async function removeFromVault(ids) {
   const hidden = currentHidden(); const sent = [];
-  for (const id of ids) { try { const f = await V.read(id, hidden); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); sent.push(id); await sleep(450); } catch (e) { toast(e.message); } }
+  for (const id of ids) { try { const x = exportOf(await V.read(id, hidden)); saveBytes(x.name, x.data, x.type); sent.push(id); await sleep(450); } catch (e) { toast(e.message); } }
   if (!sent.length) return;
   // A web page cannot see whether the download finished, so ask before deleting anything.
-  const ans = await choose({ title: `Delete ${sent.length} file(s) from the vault?`,
-    text: 'Android saves them in your Downloads folder (a web app cannot choose the original folder). Check that they are there, then delete them from the vault.',
+  const ans = await choose({ title: `Delete ${sent.length} item(s) from the vault?`,
+    text: 'Android saves them in your Downloads folder (a web app cannot choose the original folder). Notes and links are saved as .txt files. Check that they are there, then delete them from the vault.',
     options: [{ label: 'Yes, delete from vault', value: 'yes', kind: 'primary' }, { label: 'No, keep them in the vault', value: 'no' }] });
-  if (ans === 'yes') { for (const id of sent) await V.remove(id, hidden); toast(`Removed ${sent.length} file(s) from the vault.`); }
+  if (ans === 'yes') { for (const id of sent) await V.remove(id, hidden); toast(`Removed ${sent.length} item(s) from the vault.`); }
   ui.sel.clear(); await refreshItems(); renderList(); renderBars();
 }
 async function moveItems(ids, toHidden) {
@@ -896,6 +1072,7 @@ async function openSettings() {
         h('button', { type: 'button', id: 'backup-btn', onclick: () => close('backup') }, icon('out'), 'Back up vault to a file'),
         V.hiddenUnlocked && h('button', { type: 'button', onclick: () => close('hide') }, icon('eyeoff'), 'Lock hidden files now')),
       h('p', { style: 'margin:14px 0 0;font-size:14px' }, 'Your files live inside this browser on this phone. If you clear Chrome\'s site data, or uninstall Chrome, the vault is lost. Back it up now and then.'),
+      h('p', { class: 'muted', id: 'app-version', style: 'margin:10px 0 0;font-size:13px', text: `${APP_NAME} version ${APP_VERSION}` }),
       h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', text: 'Done', onclick: () => close('done') })));
   });
   if (choice === 'backup') {
@@ -927,7 +1104,7 @@ async function doErase() {
     if (what === 'save') {
       const done = busy('Saving your files…');
       for (const [hid, list] of [[false, ui.items.files], [true, ui.items.hidden]]) {
-        for (const it of list) { try { const f = await V.read(it.id, hid); saveBytes(f.name, f.data, mimeOf(f.name, f.type)); await sleep(450); } catch {} }
+        for (const it of list) { try { const x = exportOf(await V.read(it.id, hid)); saveBytes(x.name, x.data, x.type); await sleep(450); } catch {} }
       }
       done();
       const ok = await choose({ title: 'Are all your files in Downloads?', text: 'Check your Downloads folder. After this step the vault cannot be recovered.',
@@ -949,8 +1126,10 @@ async function doErase() {
 
 /* ===================================================================== startup */
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) ui.hiddenAt = Date.now();
-  else if (V.unlocked && ui.hiddenAt && Date.now() - ui.hiddenAt > 2 * 60 * 1000) { lockVault(); toast('Locked after being away.'); }
+  if (document.hidden) { ui.hiddenAt = Date.now(); return; }
+  const away = ui.hiddenAt ? Date.now() - ui.hiddenAt : 0;
+  if (V.unlocked && away > 2 * 60 * 1000) { closeEditor(); lockVault(); toast('Locked after being away.'); }
+  else if (V.hiddenUnlocked && away > 30 * 1000) { closeEditor(); hideAgain(); }   // hidden items lock sooner than the rest
 });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); ui.installEvt = e; if (!V.unlocked && $('.lock')) renderLock(); });
 window.addEventListener('appinstalled', () => { ui.installEvt = null; });

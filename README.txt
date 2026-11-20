@@ -12,4 +12,11 @@ GitHub Pages steps (on your PC):
  5. On the phone open that address in Chrome. Tap the menu (3 dots) > "Install app" (or "Add to Home screen").
 
 Public repo note: only the app code is public. Your files and passwords never leave the phone.
-When you upload a new version, change CACHE = 'open-cheyyaku-v1' to v2 in sw.js.
+
+HOW TO UPDATE an app you already installed (your files stay safe):
+ - USB way: on the PC run the server again in this folder (python -m http.server 8000) and run: adb reverse tcp:8000 tcp:8000
+   Then open the app on the phone, wait 3 seconds, close it fully and open it again.
+ - GitHub way: upload the 5 files again (replace the old ones), then open the app, close it fully and open it again.
+ - Check Settings (gear icon): it shows "version 2" when the update worked.
+ - Do NOT clear Chrome "site data" - that erases the vault. Make a backup first (Settings > Backup).
+
